@@ -38,7 +38,7 @@ def indices_to_one_hot(data, nb_classes):
     targets = np.array(data).reshape(-1)
     return np.eye(nb_c)[targets]
 
-def load_relation_data(fname='paper_author_relationship.csv'):
+def load_relation_data(device, fname='paper_author_relationship.csv'):
     train_data = ''
     with open(DATA_ROOT_DIR+fname) as f: 
         content = f.readlines() 
@@ -70,9 +70,9 @@ def load_relation_data(fname='paper_author_relationship.csv'):
 
     return data, author_dict
 
-def load_data():
+def load_data(device):
 
-    data, author_dict = load_relation_data()
+    data, author_dict = load_relation_data(device)
 
     folds = ['train', 'valid', 'query']
 
@@ -110,6 +110,13 @@ def load_data():
         for a in content: 
             samples.append([author_dict[a[0]], author_dict[a[1]]])
         query_samples = torch.tensor(samples) 
+
+    data = data.to(device)
+    train_true_samples = train_true_samples.to(device)
+    train_false_samples = train_false_samples.to(device)
+    valid_true_samples = valid_true_samples.to(device)
+    valid_false_samples = valid_false_samples.to(device)
+    query_samples = query_samples.to(device)
 
     return data, train_true_samples, train_false_samples, valid_true_samples, valid_false_samples, query_samples
     

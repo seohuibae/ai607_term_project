@@ -31,15 +31,19 @@ class GraphConvolution(nn.Module):
         N_s = x_s.shape[0]
         N_t = x_t.shape[0]
         # dropout
-        if training is not False:
+        if training:
             x_s = F.dropout(x_s, self.dropout)
             x_t = F.dropout(x_t, self.dropout)
         
         # concatenate 
         x = torch.cat([x_s, x_t], dim=0)
-        edge_index[1] += N_s 
+        src = edge_index[0]
+        dst = edge_index[1] 
+        dst = torch.add(dst, N_s)
+        edge_index_input = torch.cat([src.unsqueeze(0),dst.unsqueeze(0)], dim=0)        
+
         # convolve
-        x = self.conv(x, edge_index, edge_weight=None) # external library
+        x = self.conv(x, edge_index_input, edge_weight=None) # external library
         
         # activation
         x = self.activation(x)
@@ -48,27 +52,27 @@ class GraphConvolution(nn.Module):
 
         return x_s, x_t 
 
-class LinearEmbedding(nn.Module):
+# class LinearEmbedding(nn.Module):
 
-    def __init__(self, input_dim, output_dim,
-                 activation=nn.ReLU(),
-                 bias=False,**kwargs):
-        super(LinearEmbedding, self).__init__(**kwargs)
-        self.type = 'linear'
+#     def __init__(self, input_dim, output_dim,
+#                  activation=nn.ReLU(),
+#                  bias=False,**kwargs):
+#         super(LinearEmbedding, self).__init__(**kwargs)
+#         self.type = 'linear'
 
-        self.activation = activation
-        self.usebias = bias
-        self.lin = nn.Linear(input_dim, output_dim, bias=bias)
+#         self.activation = activation
+#         self.usebias = bias
+#         self.lin = nn.Linear(input_dim, output_dim, bias=bias)
 
-    def forward(self, x):
-        # dropout
-        if training is not False:
-            x = F.dropout(x, self.dropout)
-        # projection
-        x = self.lin(x)
-        # activation
-        x = self.activation(x)
-        return x
+#     def forward(self, x):
+#         # dropout
+#         if training is not False:
+#             x = F.dropout(x, self.dropout)
+#         # projection
+#         x = self.lin(x)
+#         # activation
+#         x = self.activation(x)
+#         return x
 
 
 class GCN(nn.Module):
@@ -120,7 +124,7 @@ class LinkPredictor(nn.Module):
         
     def forward(self, x, pos_edge_index, neg_edge_index=None): # x: gnn output
 
-        pos_score = self.bilinear(self.linear_src(x[pos_edge_index[0,:]]), self.linear_dst(x[pos_edge_index[1,:]]))
+        pos_score = self.bilinear(self.linear_src(x[pos_edge_index[0,:],:]), self.linear_dst(x[pos_edge_index[1,:],:]))
         pos_score = self.sigmoid(pos_score)
         neg_score = self.bilinear(self.linear_src(x[neg_edge_index[0,:]]), self.linear_dst(x[neg_edge_index[1,:]]))
         neg_score = self.sigmoid(neg_score)
@@ -131,7 +135,6 @@ class LinkPredictor(nn.Module):
     def _compute_link_loss(self, pos_score, neg_score):            
         margin=1
         n_edges = pos_score.shape[0]
-        if weights is None: 
-            loss = ((margin-pos_score).unsqueeze(1) + (neg_score.view(n_edges, -1))).clamp(min=0).mean()
-
+        loss = ((margin-pos_score).unsqueeze(1) + (neg_score.view(n_edges, -1))).clamp(min=0).mean()
+        # loss = ((margin-pos_score).pow(2).unsqueeze(1) + (neg_score.pow(2).view(n_edges, -1))).clamp(min=0).mean()
         return loss 
