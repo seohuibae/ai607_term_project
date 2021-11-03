@@ -15,13 +15,13 @@ conda env create --file environment.yaml
 
 ## Model description
 ### baseline 
-initial paper/author node embedding\
-- nn.Embedding whose dimension is the number of paper/author\
-node embedding extraction\
-- GCN\
-link prediction\
-- minimizing triplet loss (positive pairs gets closer, negative pairs gets distant)\
-- a bilinear projection to measure the distance of two embeddings\
+0. initial paper/author node embedding
+- nn.Embedding whose dimension is the number of paper/author
+1. node embedding extraction
+- GCN
+2. link prediction
+- minimizing triplet loss (positive pairs gets closer, negative pairs gets distant)
+- a bilinear projection to measure the distance of two embeddings
 
 ### ours 
 \
