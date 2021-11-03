@@ -16,7 +16,7 @@ conda env create --file environment.yaml
 ## Model description
 ### baseline 
 0. initial paper/author node embedding
-- nn.Embedding whose dimension is the number of paper/author
+- nn.Embedding whose input dimension equals to the total number of paper/authors
 1. node embedding extraction
 - GCN
 2. link prediction
@@ -24,7 +24,7 @@ conda env create --file environment.yaml
 - a bilinear projection to measure the distance of two embeddings
 
 ### ours 
-\
+
 
 ## How to train
 ### baseline 
