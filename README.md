@@ -9,9 +9,9 @@ Same author detection problem
 - pytorch_geometric (https://github.com/pyg-team/pytorch_geometric) 
 
 ### how to install 
-'''
+```
 conda env create --file environment.yaml
-'''
+```
 
 ## Model description
 ### baseline 
@@ -28,7 +28,7 @@ link prediction \
 
 ## How to train
 ### baseline 
-'''
+```
 python train_baseline.py 
-'''
+```
 
