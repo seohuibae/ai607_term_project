@@ -40,7 +40,6 @@ def predict(pos_score, neg_score):
     return pos_pred, neg_pred 
 
 def main(): 
-
     data, train_true_samples, train_false_samples, valid_true_samples, valid_false_samples, query_samples = load_data(device)
     edge_index = data.edge_index.to(device)
     x_s=data.x_s.to(device) 
@@ -62,6 +61,7 @@ def main():
         begin = time.time()
         pos_edge_index = train_true_samples.t().to(device)
         neg_edge_index = construct_negative_graph(pos_edge_index, data.N_t, 1, device)
+        # neg_edge_index = construct_gt_negative(pos_edge_index, train_false_samples, 0.9, data.N_t, 1, device)
         
         loss, pos_score, neg_score  = model(x_s, x_t, edge_index, pos_edge_index, neg_edge_index, device)
 

@@ -3,6 +3,8 @@ import numpy as np
 from torch_geometric.data  import Data
 from torch_geometric.data import DataLoader 
 
+from itertools import combinations
+
 class BipartiteData(Data):
     def __init__(self, edge_index, x_s, x_t, N_s, N_t): # s: paper, t: author
         super(BipartiteData, self).__init__() 
@@ -49,12 +51,15 @@ def load_relation_data(device, fname='paper_author_relationship.csv'):
         N_t = len(author_strs)
         author_ints = [i for i in range(N_t)]
         author_dict = dict(zip(author_strs, author_ints))
-        
     # one-hot encoded initial feature vectors
     # x_s = indices_to_one_hot(paper_ints, N_s) 
     # x_t = indiceS_to_one_hot(author_ints, N_t)
     x_s = torch.tensor(paper_ints) 
     x_t = torch.tensor(author_ints)
+
+    paper_dict = dict()
+    for idx, author in zip(paper_ints, content): 
+        paper_dict[idx] = author
 
     # edge index
     edge_index = []
@@ -68,25 +73,29 @@ def load_relation_data(device, fname='paper_author_relationship.csv'):
     
     data = BipartiteData(edge_index=edge_index, x_s=x_s, x_t=x_t, N_s=N_s, N_t=N_t)
 
-    return data, author_dict
+    return data, author_dict, paper_dict
 
 def load_data(device):
 
-    data, author_dict = load_relation_data(device)
+    data, author_dict, paper_dict = load_relation_data(device)
 
     folds = ['train', 'valid', 'query']
 
-    
     with open(DATA_ROOT_DIR+'train_dataset.csv') as f: 
         content = f.readlines() 
         content = content[1:]
         content = [[tmp.strip() for tmp in a.strip().split(',')] for a in content]
         true = []
-        false = []
         for a in content: 
             true.append([author_dict[a[0]], author_dict[a[1]]])
         train_true_samples = torch.tensor(true) 
-        train_false_samples = torch.tensor(false)
+
+    false = []
+    for _, authors in enumerate(paper_dict.items()):
+        authors = authors[1]
+        for pair in combinations(authors, 2):
+            false.append([author_dict[pair[0]], author_dict[pair[0]]])
+    train_false_samples = torch.tensor(false)
 
     with open(DATA_ROOT_DIR+'valid_dataset.csv') as f: 
         content = f.readlines() 
