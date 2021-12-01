@@ -23,10 +23,10 @@ class Model(nn.Module):
         self.feature_extractor = BiLevelGCN(input_dim=emb_dim, hiddens=gnn_hiddens, output_dim=pred_emb_dim)
         self.link_predictor = LinkPredictor(emb_dim=pred_emb_dim)
 
-    def forward(self, x_s, x_t, edge_index, paper_edge_index, pos_edge_index, neg_edge_index, device):
+    def forward(self, x_s, x_t, edge_index, paper_edge_index, author_edge_index, pos_edge_index, neg_edge_index, device):
         x_s = self.emb_s(x_s)
         x_t = self.emb_s(x_t) 
-        x_s, x_t = self.feature_extractor(x_s=x_s, x_t=x_t, edge_index=edge_index, paper_edge_index=paper_edge_index)
+        x_s, x_t = self.feature_extractor(x_s=x_s, x_t=x_t, edge_index=edge_index, paper_edge_index=paper_edge_index, author_edge_index=author_edge_index)
         loss, pos_score, neg_score = self.link_predictor(x_t, pos_edge_index, neg_edge_index)
 
         return loss, pos_score, neg_score
@@ -43,6 +43,10 @@ def main():
     # print(data.N_t) # 61442
     print('construct paper edge index')
     paper_edge_index = create_paper_edge_index(edge_index, data.N_t).to(device) # changed! 
+    author_edge_index = create_author_edge_index(edge_index, data.N_s).to(device) # changed! 
+    #paper_edge_index = torch.rand((2, 10000)).to(device)
+    #author_edge_index = torch.rand((2, 10000)).to(device)
+    #import pdb; pdb.set_trace()
     print('done')
 
     model = Model(x_s_dim=data.N_s, x_t_dim=data.N_t, emb_dim=args.emb_dim, gnn_hiddens=args.hiddens, pred_emb_dim=args.pred_emb_dim).to(device)
@@ -62,8 +66,9 @@ def main():
         begin = time.time()
         pos_edge_index = train_true_samples.t().to(device)
         neg_edge_index = construct_negative_graph(pos_edge_index, data.N_t, 1, device)
+        #neg_edge_index = construct_negative_graph_plus(pos_edge_index, data.N_t, 1, device, train_false_samples)
         
-        loss, pos_score, neg_score  = model(x_s, x_t, edge_index, paper_edge_index, pos_edge_index, neg_edge_index, device)
+        loss, pos_score, neg_score  = model(x_s, x_t, edge_index, paper_edge_index, author_edge_index, pos_edge_index, neg_edge_index, device)
 
         optimizer.zero_grad() 
         loss.backward()
@@ -74,10 +79,10 @@ def main():
             pos_edge_index = valid_true_samples.t().to(device)
             neg_edge_index = valid_false_samples.t().to(device)
 
-            val_loss, pos_score, neg_score  = model(x_s, x_t, edge_index, paper_edge_index, pos_edge_index, neg_edge_index, device)
+            val_loss, pos_score, neg_score  = model(x_s, x_t, edge_index, paper_edge_index, author_edge_index, pos_edge_index, neg_edge_index, device)
             pos_pred, neg_pred = predict(pos_score, neg_score)
-            print(pos_pred)
-            print(neg_pred)
+            #print(pos_pred)
+            #print(neg_pred)
             accuracy, precision, recall, f1_score = metric(pos_pred, neg_pred)
             val_acc = accuracy 
 

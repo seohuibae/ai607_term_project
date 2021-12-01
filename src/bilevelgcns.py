@@ -7,6 +7,7 @@ from config import *
 from torch_geometric.nn.conv import MessagePassing, GCNConv, GATConv, SAGEConv
 
 from itertools import combinations
+from itertools import permutations
 
 def create_paper_edge_index(edge_index, num_authors): 
     
@@ -21,8 +22,10 @@ def create_paper_edge_index(edge_index, num_authors):
         es = map(list, es)
         paper_edge_index.extend(es)
         # break
+    # paper_edge_index = set(paper_edge_index)
+    # paper_edge_index = list(map(list, paper_edge_index))
     paper_edge_index = torch.LongTensor(paper_edge_index).t()
-    src, tgt = paper_edge_index[0], paper_edge_index[1]
+    # src, tgt = paper_edge_index[0], paper_edge_index[1]
     # paper_edge_index_ = torch.cat([tgt.unsqueeze(0),src.unsqueeze(0)], dim=0)
     # paper_edge_index = torch.cat([paper_edge_index, paper_edge_index_], dim=1)
     print(paper_edge_index.shape) # ([2, 70531664])*2
@@ -33,7 +36,35 @@ def create_paper_edge_index(edge_index, num_authors):
     paper_edge_index = paper_edge_index[:,idx]
         
     return paper_edge_index
-            
+
+
+def create_author_edge_index(edge_index, num_papers): 
+    
+    src = edge_index[0] #p
+    tgt = edge_index[1] #a
+    # print(edge_index.shape) 
+
+    author_edge_index = []
+    for src_idx in range(num_papers):
+        author_neighbors = tgt[(src==src_idx)].cpu().tolist()
+        es = list(combinations(author_neighbors, 2))
+        es = map(list, es)
+        author_edge_index.extend(es)
+        # break
+    # author_edge_index = set(author_edge_index)
+    # author_edge_index = list(map(list, author_edge_index))
+    author_edge_index = torch.LongTensor(author_edge_index).t()
+    # src, tgt = author_edge_index[0], author_edge_index[1]
+    # author_edge_index_ = torch.cat([tgt.unsqueeze(0),src.unsqueeze(0)], dim=0)
+    # author_edge_index = torch.cat([author_edge_index, author_edge_index_], dim=1)
+    print(author_edge_index.shape) 
+
+    # num_gen_edges = author_edge_index.size(1)
+    # perm = torch.randperm(num_gen_edges)
+    # idx = perm[:int(num_gen_edges*0.1)]
+    # author_edge_index = author_edge_index[:,idx]
+        
+    return author_edge_index
 
 class BiLevelGraphConvolution(nn.Module):
     """
@@ -52,12 +83,17 @@ class BiLevelGraphConvolution(nn.Module):
         self.usebias = bias
         self.input_dim = input_dim
         self.output_dim = output_dim
-        self.lin_s = nn.Linear(input_dim, input_dim)
-        self.lin_t = nn.Linear(input_dim, input_dim)
-        self.conv_1 = GCNConv(input_dim, output_dim, bias=bias)
-        self.conv_2 = GCNConv(output_dim, output_dim, bias=bias)
+        self.lin_s = nn.Linear(input_dim, input_dim)  # s to space t
+        self.lin_t = nn.Linear(input_dim, input_dim)  # t to space s
 
-    def forward(self, edge_index, paper_edge_index, x_s, x_t, training=None):
+        # self.conv_1 = GCNConv(input_dim, output_dim, bias=bias)
+        # self.conv_2 = GCNConv(input_dim, output_dim, bias=bias)
+        self.conv_1 = GATConv(input_dim, output_dim, bias=bias)
+        self.conv_2 = GATConv(input_dim, output_dim, bias=bias)
+        # self.conv_1 = SAGEConv(input_dim, output_dim, bias=bias)
+        # self.conv_2 = SAGEConv(input_dim, output_dim, bias=bias)
+
+    def forward(self, edge_index, paper_edge_index, author_edge_index, x_s, x_t, training=None):
         # edge_index: src(papers) , tgts(authors)
         N_s = x_s.shape[0]
         N_t = x_t.shape[0]
@@ -68,11 +104,10 @@ class BiLevelGraphConvolution(nn.Module):
 
         # 0. to different embedding space
         x_s = self.lin_s(x_s)
-        x_t = self.lin_s(x_t)
+        x_t = self.lin_t(x_t)
 
         # 1. level 1 convolve: authors -> papers 
         # concatenate
-        x = torch.cat([x_s, x_t], dim=0)
         src = edge_index[0]
         dst = edge_index[1]
         dst = torch.add(dst, N_s) # reindexed 
@@ -81,19 +116,22 @@ class BiLevelGraphConvolution(nn.Module):
         # dst_ = src 
         edge_index_reindexed = torch.cat([src.unsqueeze(0),dst.unsqueeze(0)], dim=0)
         edge_index_reindexed_T  = torch.cat([dst.unsqueeze(0),src.unsqueeze(0)], dim=0)
-        edge_index_reindexed = torch.cat([edge_index_reindexed, edge_index_reindexed_T], dim=1)
+        #edge_index_reindexed = torch.cat([edge_index_reindexed, edge_index_reindexed_T], dim=1)
         # print(edge_index_reindexed.shape)
 
-        x = self.conv_1(x, edge_index_reindexed, edge_weight=None) # convolve
-        x = self.activation(x) # activation
-        x_s = x[:N_s]
-        x_t = x[N_s:]
-        
-        # 2. level 2 convolve: papers -> papers 
-        x_s = self.conv_2(x_s, paper_edge_index, edge_weight=None) # convolve
-        x_s = self.activation(x_s) # activation
+        x = torch.cat([x_s, x_t], dim=0)
 
-       
+        edge = torch.cat([edge_index_reindexed, author_edge_index], dim=1)
+        new_x_t = self.conv_1(x, edge) # convolve
+        new_x_t = self.activation(new_x_t) # activation
+
+        edge = torch.cat([edge_index_reindexed_T, paper_edge_index], dim=1)
+        new_x_s = self.conv_2(x, edge) # convolve
+        new_x_s = self.activation(new_x_s) # activation
+
+        x_s = new_x_s[:N_s]
+        x_t = new_x_t[N_s:]
+      
         return x_s, x_t
 
 
@@ -114,7 +152,7 @@ class BiLevelGCN(nn.Module):
         self.layers_.append(layer0)
         nhiddens = len(hiddens)
         for _ in range(1,nhiddens):
-            layertemp = GraphConvolution(input_dim=hiddens[_-1],
+            layertemp = BiLevelGraphConvolution(input_dim=hiddens[_-1],
                                       output_dim=hiddens[_], dropout=args.dropout,
                                       activation=nn.ReLU())
             self.layers_.append(layertemp)
@@ -127,8 +165,8 @@ class BiLevelGCN(nn.Module):
         self.hiddens = hiddens
 
 
-    def forward(self, edge_index, paper_edge_index, x_s, x_t, training=None):
+    def forward(self, edge_index, paper_edge_index, author_edge_index, x_s, x_t, training=None):
 
         for layer in self.layers_:
-            x_s, x_t = layer(edge_index, paper_edge_index, x_s, x_t, training=training)
+            x_s, x_t = layer(edge_index, paper_edge_index, author_edge_index, x_s, x_t, training=training)
         return x_s, x_t
