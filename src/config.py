@@ -28,6 +28,7 @@ def get_params():
     parser.add_argument('--normalize', action='store_true') # mnormalize feature 
     parser.add_argument('--l2reg', action='store_true')
 
+    parser.add_argument('--expname', type=str, default='')
     args, _ = parser.parse_known_args()
 
     return args

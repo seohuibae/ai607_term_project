@@ -33,7 +33,7 @@ class Model(nn.Module):
     
 
 
-def main(): 
+def main(trials=1): 
 
     data, train_true_samples, train_false_samples, valid_true_samples, valid_false_samples, query_samples = load_data(device)
     edge_index = data.edge_index.to(device)
@@ -43,66 +43,74 @@ def main():
     # print(data.N_t) # 61442
     print('construct paper edge index')
     paper_edge_index = create_paper_edge_index(edge_index, data.N_t).to(device) # changed! 
+    print('construct author edge index')
     author_edge_index = create_author_edge_index(edge_index, data.N_s).to(device) # changed! 
     #paper_edge_index = torch.rand((2, 10000)).to(device)
     #author_edge_index = torch.rand((2, 10000)).to(device)
     #import pdb; pdb.set_trace()
     print('done')
 
-    model = Model(x_s_dim=data.N_s, x_t_dim=data.N_t, emb_dim=args.emb_dim, gnn_hiddens=args.hiddens, pred_emb_dim=args.pred_emb_dim).to(device)
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-   
-
-    best_epoch = 0
-    curr_step = 0
-    best_val_acc = 0
-    best_val_loss = 10000
-    best_val_acc_trail=0
-
-    model.train() 
     
-    for epoch in range(args.epochs):
-        begin = time.time()
-        pos_edge_index = train_true_samples.t().to(device)
-        neg_edge_index = construct_negative_graph(pos_edge_index, data.N_t, 1, device)
-        #neg_edge_index = construct_negative_graph_plus(pos_edge_index, data.N_t, 1, device, train_false_samples)
+    print("experiment: ", args.expname)
+    accs = []
+    for t in range(trials):
+        model = Model(x_s_dim=data.N_s, x_t_dim=data.N_t, emb_dim=args.emb_dim, gnn_hiddens=args.hiddens, pred_emb_dim=args.pred_emb_dim).to(device)
+
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+
+        best_epoch = 0
+        curr_step = 0
+        best_val_acc = 0
+        best_val_loss = 10000
+        best_val_acc_trail=0
+
+        model.train() 
+    
+        for epoch in range(args.epochs):
+            begin = time.time()
+            pos_edge_index = train_true_samples.t().to(device)
+            neg_edge_index = construct_negative_graph(pos_edge_index, data.N_t, 1, device)
+            # neg_edge_index = construct_gt_negative(edge_index, gt_negative, 1, data.N_t, 1, device)
+            #neg_edge_index = construct_negative_graph_plus(pos_edge_index, data.N_t, 1, device, train_false_samples)
+            
+            loss, pos_score, neg_score  = model(x_s, x_t, edge_index, paper_edge_index, author_edge_index, pos_edge_index, neg_edge_index, device)
+
+            optimizer.zero_grad() 
+            loss.backward()
+            optimizer.step() 
+
+            with torch.no_grad(): 
+                model.eval()
+                pos_edge_index = valid_true_samples.t().to(device)
+                neg_edge_index = valid_false_samples.t().to(device)
+
+                val_loss, pos_score, neg_score  = model(x_s, x_t, edge_index, paper_edge_index, author_edge_index, pos_edge_index, neg_edge_index, device)
+                pos_pred, neg_pred = predict(pos_score, neg_score)
+                #print(pos_pred)
+                #print(neg_pred)
+                accuracy, precision, recall, f1_score = metric(pos_pred, neg_pred)
+                val_acc = accuracy 
+
+            if val_acc > best_val_acc:
+                curr_step = 0
+                best_epoch = epoch
+                best_val_acc = val_acc
+                best_val_loss= val_loss.item()
+                if val_acc>best_val_acc_trail:
+                    best_val_acc_trail = val_acc
+            else:
+                curr_step +=1
+
+            print(f"epoch={epoch+1}, train_loss={loss.item():.5f}, val_loss={val_loss.item():.5f}, val_acc={accuracy:.5f}, prec={precision:.5f}, recall={recall:.5f}, f1={f1_score:.5f}, best_val_acc={best_val_acc:.5f}, best_val_acc_trail={best_val_acc_trail:.5f}, time={(time.time()-begin):.5f}s")
+            if curr_step > args.early_stop:
+                break 
         
-        loss, pos_score, neg_score  = model(x_s, x_t, edge_index, paper_edge_index, author_edge_index, pos_edge_index, neg_edge_index, device)
-
-        optimizer.zero_grad() 
-        loss.backward()
-        optimizer.step() 
-
-        with torch.no_grad(): 
-            model.eval()
-            pos_edge_index = valid_true_samples.t().to(device)
-            neg_edge_index = valid_false_samples.t().to(device)
-
-            val_loss, pos_score, neg_score  = model(x_s, x_t, edge_index, paper_edge_index, author_edge_index, pos_edge_index, neg_edge_index, device)
-            pos_pred, neg_pred = predict(pos_score, neg_score)
-            #print(pos_pred)
-            #print(neg_pred)
-            accuracy, precision, recall, f1_score = metric(pos_pred, neg_pred)
-            val_acc = accuracy 
-
-        if val_acc > best_val_acc:
-            curr_step = 0
-            best_epoch = epoch
-            best_val_acc = val_acc
-            best_val_loss= val_loss.item()
-            if val_acc>best_val_acc_trail:
-                best_val_acc_trail = val_acc
-        else:
-            curr_step +=1
-
-        print(f"epoch={epoch+1}, train_loss={loss.item():.5f}, val_loss={val_loss.item():.5f}, val_acc={accuracy:.5f}, prec={precision:.5f}, recall={recall:.5f}, f1={f1_score:.5f}, best_val_acc_trail={best_val_acc_trail:.5f}, time={(time.time()-begin):.5f}s")
-        if curr_step > args.early_stop:
-            break 
-        
-    return best_val_acc
+        accs.append(best_val_acc_trail)
+    return accs
 
 if __name__ == "__main__":
-    main()
+    accs = main(10)
+    print("experiment: ", args.expname)
+    print(f"result: {np.mean(accs):.5f}({np.var(accs):.5f})")
 
     

@@ -37,6 +37,9 @@ def metric(pos_pred, neg_pred):
     accuracy = (TP+TN)/N
     precision = TP/(TP+FP)
     recall = TP/(TP+FN)
-    f1_score =  2*(recall * precision) / (recall + precision)
+    if precision+recall != 0: 
+        f1_score =  2*(recall * precision) / (recall + precision)
+    else: 
+        f1_score = 0.
     
     return accuracy, precision, recall, f1_score
