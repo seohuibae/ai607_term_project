@@ -1,6 +1,6 @@
 from collections import Counter
 from utils import *
-import numpy as np 
+import numpy as np
 
 
 def degree_authors(edge_index):
@@ -31,28 +31,28 @@ def main():
     degree = degree_authors(edge_index)
     deg_cnt = Counter(list(degree.values()))
     mean_degree = sum(degree.values())/len(degree)
-    
+
     print(deg_cnt)
     print(mean_degree)
-    
+
     input()
 
     i=0
-    while True: 
+    while True:
         author = tp_authors[:, i].tolist()
         data = [degree[author[0]],degree[author[1]]]
         print(data)
         author = tn_authors[:, i].tolist()
         data = [degree[author[0]],degree[author[1]]]
         print(data)
-        
+
         author = fn_authors[:, i].tolist()
         data = [degree[author[0]],degree[author[1]]]
         print(data)
-        author = fp_authors[:, i].tolist()
-        data = [degree[author[0]],degree[author[1]]]
-        print(data)
-        
+        #author = fp_authors[:, i].tolist()
+        #data = [degree[author[0]],degree[author[1]]]
+        #print(data)
+
         i+=1
         input()
     # fn_authors_degree = []

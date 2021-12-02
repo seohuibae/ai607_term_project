@@ -9,8 +9,9 @@ from torch_geometric.nn.conv import MessagePassing, GCNConv, GATConv, SAGEConv
 from itertools import combinations
 from itertools import permutations
 
-def create_paper_edge_index(edge_index, num_authors): 
-    if os.path.exists('tmp/page_edge_index.npy'):
+def create_paper_edge_index(edge_index, num_authors):
+    if os.path.exists('tmp/paper_edge_index.npy'):
+        print('loading')
         paper_edge_index = np.load('tmp/paper_edge_index.npy')
         paper_edge_index = torch.LongTensor(paper_edge_index)
     else:
@@ -39,18 +40,19 @@ def create_paper_edge_index(edge_index, num_authors):
     idx = perm[:int(num_gen_edges*0.1)]
     paper_edge_index = paper_edge_index[:,idx]
     print(paper_edge_index.shape)
-        
+
     return paper_edge_index
 
 
-def create_author_edge_index(edge_index, num_papers): 
+def create_author_edge_index(edge_index, num_papers):
     if os.path.exists('tmp/author_edge_index.npy'):
+        print('loading')
         author_edge_index = np.load('tmp/author_edge_index.npy')
         author_edge_index = torch.LongTensor(author_edge_index)
     else:
         src = edge_index[0] #p
         tgt = edge_index[1] #a
-        # print(edge_index.shape) 
+        # print(edge_index.shape)
 
         author_edge_index = []
         for src_idx in range(num_papers):
@@ -67,12 +69,12 @@ def create_author_edge_index(edge_index, num_papers):
         # author_edge_index = torch.cat([author_edge_index, author_edge_index_], dim=1)
         np.save('tmp/author_edge_index.npy', author_edge_index.cpu().detach().numpy())
         print('saved')
-    print(author_edge_index.shape) 
+    print(author_edge_index.shape)
     # num_gen_edges = author_edge_index.size(1)
     # perm = torch.randperm(num_gen_edges)
     # idx = perm[:int(num_gen_edges*0.1)]
     # author_edge_index = author_edge_index[:,idx]
-        
+
     return author_edge_index
 
 class BiLevelGraphConvolution(nn.Module):
@@ -115,14 +117,14 @@ class BiLevelGraphConvolution(nn.Module):
         x_s = self.lin_s(x_s)
         x_t = self.lin_t(x_t)
 
-        # 1. level 1 convolve: authors -> papers 
+        # 1. level 1 convolve: authors -> papers
         # concatenate
         src = edge_index[0]
         dst = edge_index[1]
-        dst = torch.add(dst, N_s) # reindexed 
-        # change direction authors to papers ? 
+        dst = torch.add(dst, N_s) # reindexed
+        # change direction authors to papers ?
         # src_ = dst
-        # dst_ = src 
+        # dst_ = src
         edge_index_reindexed = torch.cat([src.unsqueeze(0),dst.unsqueeze(0)], dim=0)
         edge_index_reindexed_T  = torch.cat([dst.unsqueeze(0),src.unsqueeze(0)], dim=0)
         #edge_index_reindexed = torch.cat([edge_index_reindexed, edge_index_reindexed_T], dim=1)
@@ -140,14 +142,14 @@ class BiLevelGraphConvolution(nn.Module):
 
         x_s = new_x_s[:N_s]
         x_t = new_x_t[N_s:]
-      
+
         return x_s, x_t
 
 
 class BiLevelGCN(nn.Module):
     def __init__(self, input_dim, hiddens, output_dim,**kwargs):
         super(BiLevelGCN, self).__init__(**kwargs)
-        
+
         try:
             hiddens = [int(s) for s in args.hiddens.split('-')]
         except:

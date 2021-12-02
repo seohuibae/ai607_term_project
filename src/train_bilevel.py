@@ -49,7 +49,7 @@ def main():
     #paper_edge_index = torch.rand((2, 10000)).to(device)
     #author_edge_index = torch.rand((2, 10000)).to(device)
     #import pdb; pdb.set_trace()
-    print('done') 
+    print('done')
 
     print("experiment: ", args.expname)
 
@@ -103,7 +103,7 @@ def main():
         print(f"epoch={epoch+1}, train_loss={loss.item():.5f}, val_loss={val_loss.item():.5f}, val_acc={accuracy:.5f}, prec={precision:.5f}, recall={recall:.5f}, f1={f1_score:.5f}, best_val_acc={best_val_acc:.5f}, best_val_acc_trail={best_val_acc_trail:.5f}, time={(time.time()-begin):.5f}s")
         if curr_step > args.early_stop:
             break
-            
+
     save_data(edge_index, pos_edge_index, neg_edge_index, pos_pred, neg_pred)
     return best_val_acc_trail
 
