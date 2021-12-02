@@ -16,3 +16,4 @@ def predict(pos_score, neg_score):
     neg_pred[neg_correct] = 1
 
     return pos_pred, neg_pred 
+

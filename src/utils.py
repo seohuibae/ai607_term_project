@@ -1,4 +1,5 @@
 import torch 
+import numpy as np 
 
 def construct_negative_graph(edge_index, num_nodes, k, device): # k: number of negative examples
     src, dst = edge_index[0,:], edge_index[1,:]
@@ -43,3 +44,25 @@ def metric(pos_pred, neg_pred):
         f1_score = 0.
     
     return accuracy, precision, recall, f1_score
+    
+
+def save_data(edge_index, true_samples, false_samples, pos_pred, neg_pred):
+    np.save('preds/edge_index.npy', edge_index.cpu().detach().numpy())
+    np.save('preds/true_samples.npy', true_samples.cpu().detach().numpy())
+    np.save('preds/false_samples.npy', false_samples.cpu().detach().numpy())
+    np.save('preds/pos_pred.npy', pos_pred.cpu().detach().numpy())
+    np.save('preds/neg_pred.npy', neg_pred.cpu().detach().numpy())
+    # np.save('preds/fns_idx.npy', fns_idx)
+    # np.save('preds/fps_idx.npy', fps_idx)
+    print('saved')
+
+def load_pred_data():
+    edge_index = np.load('preds/edge_index.npy')
+    true_samples = np.load('preds/true_samples.npy')
+    false_samples = np.load('preds/false_samples.npy')
+    pos_pred = np.load('preds/pos_pred.npy')
+    neg_pred = np.load('preds/neg_pred.npy')
+    # fns_idx = np.load('preds/fns_idx.npy')
+    # fps_idx = np.load('preds/fps_idx.npy')
+    print('loaded')
+    return edge_index, true_samples, false_samples, pos_pred, neg_pred

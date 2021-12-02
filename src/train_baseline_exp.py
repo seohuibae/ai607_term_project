@@ -39,6 +39,9 @@ def main(trials=1):
 
     print("experiment: ", args.expname)
     accs = []
+    precs = []
+    recs = []
+    f1s = []
     for t in range(trials):
         model = Baseline(x_s_dim=data.N_s, x_t_dim=data.N_t, emb_dim=args.emb_dim, gnn_hiddens=args.hiddens, pred_emb_dim=args.pred_emb_dim).to(device)
 
@@ -48,6 +51,9 @@ def main(trials=1):
         best_epoch = 0
         curr_step = 0
         best_val_acc = 0
+        best_val_prec = 0
+        best_val_rec = 0
+        best_val_f1 = 0
         best_val_loss = 10000
         best_val_acc_trail=0
 
@@ -55,8 +61,8 @@ def main(trials=1):
         for epoch in range(args.epochs):
             begin = time.time()
             pos_edge_index = train_true_samples.t().to(device)
-            neg_edge_index = construct_negative_graph(pos_edge_index, data.N_t, 1, device)
-            # neg_edge_index = construct_gt_negative(pos_edge_index, train_false_samples, 0.9, data.N_t, 1, device)
+            # neg_edge_index = construct_negative_graph(pos_edge_index, data.N_t, 1, device)
+            neg_edge_index = construct_gt_negative(pos_edge_index, train_false_samples, 0.9, data.N_t, 1, device)
 
             loss, pos_score, neg_score  = model(x_s, x_t, edge_index, pos_edge_index, neg_edge_index, device)
 
@@ -73,11 +79,17 @@ def main(trials=1):
                 pos_pred, neg_pred = predict(pos_score, neg_score)
                 accuracy, precision, recall, f1_score = metric(pos_pred, neg_pred)
                 val_acc = accuracy
+                val_prec = precision 
+                val_rec = recall 
+                val_f1 = f1_score 
 
             if val_acc > best_val_acc:
                 curr_step = 0
                 best_epoch = epoch
                 best_val_acc = val_acc
+                best_val_prec = val_prec 
+                best_val_rec = val_rec 
+                best_val_f1 = val_f1
                 best_val_loss= val_loss.item()
                 if val_acc>best_val_acc_trail:
                     best_val_acc_trail = val_acc
@@ -89,14 +101,19 @@ def main(trials=1):
             if curr_step > args.early_stop:
                 break
         accs.append(best_val_acc_trail)
+        precs.append(best_val_prec)
+        recs.append(best_val_rec)
+        f1s.append(best_val_f1)
 
-    save_data(edge_index, pos_edge_index, neg_edge_index, pos_pred, neg_pred)
-    return accs
+    return accs, precs, recs, f1s
 
 if __name__ == "__main__":
-    accs = main(1)
+    accs, precs, recs,f1s = main(10)
     print("experiment: ", args.expname)
-    print(f"result: {np.mean(accs):.5f}({np.var(accs):.5f})")
+    print(f"acc:        {np.mean(accs):.5f}({np.var(accs):.5f})")
+    print(f"precision:  {np.mean(precs):.5f}({np.var(precs):.5f})")
+    print(f"recall:     {np.mean(recs):.5f}({np.var(recs):.5f})")
+    print(f"f1score:    {np.mean(f1s):.5f}({np.var(f1s):.5f})")
 
 
 
