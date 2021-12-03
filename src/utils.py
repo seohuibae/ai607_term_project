@@ -1,4 +1,6 @@
 import torch 
+import torch.nn as nn 
+import torch.nn.functional as F 
 import numpy as np 
 import os 
 
@@ -27,7 +29,101 @@ def construct_gt_negative(edge_index, gt_negative, ratio, num_nodes, k, device):
     neg_edge_index = torch.cat([neg_edge_index, gt_negative], dim=-1)
     return neg_edge_index
 
-def create_paper_edge_index(edge_index, num_authors):
+def degree_dict_authors(edge_index):
+    from collections import Counter
+    deg = Counter(edge_index[1].tolist())
+    return deg
+
+def degree_dict_papers(edge_index):
+    from collections import Counter
+    deg = Counter(edge_index[0].tolist())
+    return deg
+
+def sampling_uniform(paper_edge_index, ratio):
+    num_gen_edges = paper_edge_index.size(1)
+    perm = torch.randperm(num_gen_edges)
+    idx = perm[:int(num_gen_edges*ratio)]
+    paper_edge_index = paper_edge_index[:,idx]
+    return paper_edge_index
+
+def sampling_inv_to_degree_of_neighbors(edge_index, paper_edge_index, num_papers, num_authors, ratio):
+    num_paper_edges= len(paper_edge_index[0])
+    paper_edge_index_indices = torch.tensor([i for i in range(num_paper_edges)]) # initialize
+
+    author_incents = torch.ones((num_authors,))
+    v = torch.ones((len(edge_index[0])))
+    edge_index_sparse = torch.sparse_coo_tensor(edge_index.cpu(), v, [num_papers, num_authors])
+    
+    # print(author_incents.shape)
+    # print(edge_index_sparse)
+    # print(edge_index_sparse.shape)
+    paper_incents = torch.sparse.mm(edge_index_sparse, author_incents.unsqueeze(1)).squeeze(1)
+    # print(paper_incents)
+    # print(paper_incents.shape)
+    # print(len(set(paper_incents.tolist())))
+    # input()
+
+    paper_edge_index_incents = torch.cat([paper_incents[paper_edge_index[0]].unsqueeze(0), paper_incents[paper_edge_index[1]].unsqueeze(0)], dim=0)
+    # print(paper_edge_index_incents.shape)
+    
+    paper_edge_index_incents = torch.sum(paper_edge_index_incents, 0)
+
+    
+
+    # top_k = 200
+    # v,i = torch.topk(paper_edge_index_incents, top_k)
+    # paper_edge_index_tmp = torch.zeros((num_paper_edges,))
+    # print(v)
+    # paper_edge_index_tmp[i] = v
+    # paper_edge_index_incents = paper_edge_index_tmp 
+    # print(paper_edge_index_incents)
+    # input() 
+    
+    # inverse 
+    max_ = torch.max(paper_edge_index_incents)
+    paper_edge_index_incents = max_ - paper_edge_index_incents
+    print(paper_edge_index_incents)
+    # print(paper_edge_index_incents.shape)
+    # norm = torch.sum(paper_edge_index_incents)
+    # prob = paper_edge_index_incents / norm
+    # T = 0.95
+    T = 1.8
+    print('T', str(T))
+    output = paper_edge_index_incents/T
+    prob = F.log_softmax(output)
+    prob = torch.exp(prob)
+    print(torch.mean(prob))
+    print(torch.min(prob))
+    print(prob)
+    # input()
+
+    thr = 0
+    print(len(paper_edge_index_indices))
+    paper_edge_index_indices = torch.masked_select(paper_edge_index_indices, (prob>thr))
+    print(len(paper_edge_index_indices))
+    # input()
+
+    paper_edge_index_indices = np.random.choice(paper_edge_index_indices.tolist(), int(num_paper_edges*ratio))
+    paper_edge_index = paper_edge_index[:,paper_edge_index_indices]
+
+    del author_incents
+    del paper_incents 
+    del paper_edge_index_incents
+    del prob 
+    del paper_edge_index_indices 
+    del edge_index_sparse
+    del v
+
+    return paper_edge_index
+
+def sampling_mixed(edge_index, paper_edge_index, num_papers, num_authors, ratio):
+    paper_edge_index_uni = sampling_uniform(paper_edge_index, ratio*0.8)
+    paper_edge_index_inv = sampling_inv_to_degree_of_neighbors(edge_index, paper_edge_index, num_papers, num_authors, ratio*0.2)
+    paper_edge_index = torch.cat([paper_edge_index_uni, paper_edge_index_inv], dim=1)
+    return paper_edge_index 
+
+def create_paper_edge_index(edge_index, num_papers, num_authors, ratio=0.1):
+    print(ratio)
     if os.path.exists('tmp/paper_edge_index.npy'):
         print('loading')
         paper_edge_index = np.load('tmp/paper_edge_index.npy')
@@ -53,12 +149,17 @@ def create_paper_edge_index(edge_index, num_authors):
         np.save('tmp/paper_edge_index.npy', paper_edge_index.cpu().detach().numpy())
         print('saved')
     print(paper_edge_index.shape) # ([2, 70531664])*2
-    num_gen_edges = paper_edge_index.size(1)
-    perm = torch.randperm(num_gen_edges)
-    idx = perm[:int(num_gen_edges*0.1)]
-    paper_edge_index = paper_edge_index[:,idx]
+
+    # 0. sampling random
+    paper_edge_index = sampling_uniform(paper_edge_index, ratio)
+    # 1. sampling with lower prob whose author has high degree
+    # paper_edge_index = sampling_inv_to_degree_of_neighbors(edge_index, paper_edge_index, num_papers, num_authors, ratio)
+    # 2. sampling mixed 
+    # paper_edge_index = sampling_mixed(edge_index, paper_edge_index, num_papers, num_authors, ratio) 
+
     print(paper_edge_index.shape)
 
+    # input()
     return paper_edge_index
 
 
@@ -95,23 +196,7 @@ def create_author_edge_index(edge_index, num_papers):
 
     return author_edge_index
 
-def metric(pos_pred, neg_pred):
-    pos_label = 1 
-    neg_label = 0 
-    TP = len(pos_pred[pos_pred==1])
-    FP = len(neg_pred[neg_pred==1])
-    TN = len(neg_pred[neg_pred==0])
-    FN = len(pos_pred[pos_pred==0])
-    N = TP+FP+TN+FN
-    accuracy = (TP+TN)/N
-    precision = TP/(TP+FP)
-    recall = TP/(TP+FN)
-    if precision+recall != 0: 
-        f1_score =  2*(recall * precision) / (recall + precision)
-    else: 
-        f1_score = 0.
-    
-    return accuracy, precision, recall, f1_score
+
     
 
 def save_data(edge_index, true_samples, false_samples, pos_pred, neg_pred):
@@ -134,3 +219,18 @@ def load_pred_data():
     # fps_idx = np.load('preds/fps_idx.npy')
     print('loaded')
     return edge_index, true_samples, false_samples, pos_pred, neg_pred
+
+def emptying_ckpts():
+    import glob 
+    print('remove all ckpts?')
+    input()
+    path = 'checkpoints'
+    files = glob.glob('checkpoints/*')
+    for f in files:
+        os.remove(f)
+
+def save_model(model, epoch):
+    path = f'checkpoints/model_{epoch}.pth'
+    torch.save(model.state_dict(), path)
+
+

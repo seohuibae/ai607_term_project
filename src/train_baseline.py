@@ -70,11 +70,11 @@ def main(trials=1):
                 neg_edge_index = valid_false_samples.t().to(device)
 
                 val_loss, pos_score, neg_score  = model(x_s, x_t, edge_index, pos_edge_index, neg_edge_index, device)
-                pos_pred, neg_pred = predict(pos_score, neg_score)
+                pos_pred, neg_pred, thr = predict(pos_score, neg_score)
                 accuracy, precision, recall, f1_score = metric(pos_pred, neg_pred)
                 val_acc = accuracy
 
-            if val_acc > best_val_acc:
+            if val_acc > best_val_acc and epoch > 100:
                 curr_step = 0
                 best_epoch = epoch
                 best_val_acc = val_acc

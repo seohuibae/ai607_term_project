@@ -43,7 +43,7 @@ def main(trials=1):
     # print(data.N_t) # 61442
     
     print('construct author edge index')
-    author_edge_index = create_author_edge_index(edge_index, data.N_s).to(device) # changed!
+    author_edge_index = create_author_edge_index(edge_index, num_papers=data.N_s).to(device) # changed!
     #paper_edge_index = torch.rand((2, 10000)).to(device)
     #author_edge_index = torch.rand((2, 10000)).to(device)
     #import pdb; pdb.set_trace()
@@ -58,7 +58,7 @@ def main(trials=1):
     for t in range(trials):
         print(t)
         print('construct paper edge index')
-        paper_edge_index = create_paper_edge_index(edge_index, data.N_t).to(device) # changed!
+        paper_edge_index = create_paper_edge_index(edge_index, num_papers=data.N_s, num_authors=data.N_t).to(device) # changed!
         print('done')
 
         model = Model(x_s_dim=data.N_s, x_t_dim=data.N_t, emb_dim=args.emb_dim, gnn_hiddens=args.hiddens, pred_emb_dim=args.pred_emb_dim).to(device)
@@ -79,11 +79,11 @@ def main(trials=1):
         for epoch in range(args.epochs):
             begin = time.time()
             pos_edge_index = train_true_samples.t().to(device)
-            neg_edge_index = construct_negative_graph(pos_edge_index, data.N_t, 1, device)
-            # neg_edge_index = construct_gt_negative(pos_edge_index, train_false_samples, 0.9, data.N_t, 1, device)
+            # neg_edge_index = construct_negative_graph(pos_edge_index, data.N_t, 1, device)
+            neg_edge_index = construct_gt_negative(pos_edge_index, train_false_samples, 0.9, data.N_t, 1, device)
             #neg_edge_index = construct_negative_graph_plus(pos_edge_index, data.N_t, 1, device, train_false_samples)
 
-            loss, pos_score, neg_score  = model(x_s, x_t, edge_index, paper_edge_index, author_edge_index, pos_edge_index, neg_edge_index, device)
+            loss, pos_score, neg_score = model(x_s, x_t, edge_index, paper_edge_index, author_edge_index, pos_edge_index, neg_edge_index, device)
 
             optimizer.zero_grad()
             loss.backward()
@@ -95,7 +95,7 @@ def main(trials=1):
                 neg_edge_index = valid_false_samples.t().to(device)
 
                 val_loss, pos_score, neg_score  = model(x_s, x_t, edge_index, paper_edge_index, author_edge_index, pos_edge_index, neg_edge_index, device)
-                pos_pred, neg_pred = predict(pos_score, neg_score)
+                pos_pred, neg_pred, thr = predict(pos_score, neg_score)
                 #print(pos_pred)
                 #print(neg_pred)
                 accuracy, precision, recall, f1_score = metric(pos_pred, neg_pred)
@@ -118,7 +118,7 @@ def main(trials=1):
                 curr_step +=1
 
             print(f"epoch={epoch+1}, train_loss={loss.item():.5f}, val_loss={val_loss.item():.5f}, val_acc={accuracy:.5f}, prec={precision:.5f}, recall={recall:.5f}, f1={f1_score:.5f}, best_val_acc={best_val_acc:.5f}, best_val_acc_trail={best_val_acc_trail:.5f}, time={(time.time()-begin):.5f}s")
-            if curr_step > args.early_stop:
+            if curr_step > args.early_stop and epoch > 100:
                 break
         
         del paper_edge_index

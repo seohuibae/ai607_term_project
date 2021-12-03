@@ -3,11 +3,6 @@ from utils import *
 import numpy as np
 
 
-def degree_authors(edge_index):
-    from collections import Counter
-    deg = Counter(edge_index[1].tolist())
-    return deg
-
 def main():
     edge_index, true_samples, false_samples, pos_pred, neg_pred = load_pred_data()
 
@@ -28,15 +23,22 @@ def main():
     print(fn_authors.shape)
     print(fp_authors.shape)
     input()
-    degree = degree_authors(edge_index)
+    degree = degree_dict_authors(edge_index)
+    degree_papers = degree_dict_papers(edge_index)
     deg_cnt = Counter(list(degree.values()))
     mean_degree = sum(degree.values())/len(degree)
+    mean_degree_paper = sum(degree_papers.values())/len(degree_papers)
 
-    print(deg_cnt)
+    # print(deg_cnt)
     print(mean_degree)
+    print(mean_degree_paper)
+    print(max(degree_papers.values()), min(degree_papers.values()))
+
 
     input()
 
+    paper_edge_index = edge_index[0]
+    author_edge_index = edge_index[1]
     i=0
     while True:
         author = tp_authors[:, i].tolist()
@@ -52,6 +54,14 @@ def main():
         #author = fp_authors[:, i].tolist()
         #data = [degree[author[0]],degree[author[1]]]
         #print(data)
+
+        tmp = np.concatenate([paper_edge_index[author_edge_index==author[0]], paper_edge_index[author_edge_index==author[1]]])
+        deg_tmp = []
+        for p in tmp: 
+            deg_tmp.append(degree_papers[p])
+        print(deg_tmp)
+        print(sum(deg_tmp)/len(deg_tmp))
+
 
         i+=1
         input()
