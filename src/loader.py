@@ -51,6 +51,7 @@ def load_relation_data(device, fname='paper_author_relationship.csv'):
         N_t = len(author_strs)
         author_ints = [i for i in range(N_t)]
         author_dict = dict(zip(author_strs, author_ints))
+        reverse_author_dict = dict(zip(author_ints, author_strs))
     # one-hot encoded initial feature vectors
     # x_s = indices_to_one_hot(paper_ints, N_s) 
     # x_t = indiceS_to_one_hot(author_ints, N_t)
@@ -73,11 +74,11 @@ def load_relation_data(device, fname='paper_author_relationship.csv'):
     
     data = BipartiteData(edge_index=edge_index, x_s=x_s, x_t=x_t, N_s=N_s, N_t=N_t)
 
-    return data, author_dict, paper_dict
+    return data, author_dict, paper_dict, reverse_author_dict
 
 def load_data(device):
 
-    data, author_dict, paper_dict = load_relation_data(device)
+    data, author_dict, paper_dict, reverse_author_dict = load_relation_data(device)
 
     folds = ['train', 'valid', 'query']
 
@@ -127,6 +128,6 @@ def load_data(device):
     valid_false_samples = valid_false_samples.to(device)
     query_samples = query_samples.to(device)
 
-    return data, train_true_samples, train_false_samples, valid_true_samples, valid_false_samples, query_samples
+    return data, train_true_samples, train_false_samples, valid_true_samples, valid_false_samples, query_samples, reverse_author_dict
     
   

@@ -32,7 +32,7 @@ class Baseline(nn.Module):
 
 
 def main(trials=1):
-    data, train_true_samples, train_false_samples, valid_true_samples, valid_false_samples, query_samples = load_data(device)
+    data, train_true_samples, train_false_samples, valid_true_samples, valid_false_samples, query_samples, _ = load_data(device)
     edge_index = data.edge_index.to(device)
     x_s=data.x_s.to(device)
     x_t=data.x_t.to(device)

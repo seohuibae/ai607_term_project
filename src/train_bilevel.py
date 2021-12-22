@@ -38,7 +38,7 @@ class Model(nn.Module):
 
 def main():
 
-    data, train_true_samples, train_false_samples, valid_true_samples, valid_false_samples, query_samples = load_data(device)
+    data, train_true_samples, train_false_samples, valid_true_samples, valid_false_samples, query_samples, reverse_author_dict = load_data(device)
     edge_index = data.edge_index.to(device)
     x_s=data.x_s.to(device)
     x_t=data.x_t.to(device)
@@ -132,7 +132,7 @@ def main():
     # print(score)
     print(test_thr)
     print(query_samples.shape)
-    predict_query_answer(query_samples, pos_score, neg_score, test_thr)
+    predict_query_answer(query_samples, pos_score, neg_score, test_thr, reverse_author_dict)
     input()
     print('same author .. ')
     given_samples = torch.cat([train_true_samples, train_false_samples, valid_true_samples, valid_false_samples, query_samples], dim=0)
@@ -155,7 +155,7 @@ def main():
         print(len(same_author))
     print(cnt)
     print('save same author')
-    save_same_author(same_authors)
+    save_same_author(same_authors, reverse_author_dict)
     print('done')
     
     

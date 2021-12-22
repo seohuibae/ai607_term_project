@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import itertools 
 
-def predict_query_answer(query_sample, pos_score, neg_score, thr):
+def predict_query_answer(query_sample, pos_score, neg_score, thr, reverse_dict):
     prediction = torch.ones((len(pos_score),))*(-1)
     indices = torch.tensor([i for i in range(len(pos_score))])
 
@@ -33,8 +33,8 @@ def predict_query_answer(query_sample, pos_score, neg_score, thr):
     f.write("ID, ID, label \n")
     for ans in answer:
         ans_str=[]
-        ans_str.append(str(ans[0]))
-        ans_str.append(str(ans[1]))
+        ans_str.append(str(reverse_dict[ans[0]]))
+        ans_str.append(str(reverse_dict[ans[1]]))
         if ans[2]==1:
             ans_str.append("True")
         else:
@@ -70,12 +70,12 @@ def generate_random_author_pairs(num_authors,  num_samples):
     # print(candidate_pool.shape)
     return candidate_pool
 
-def save_same_author(same_authors): 
+def save_same_author(same_authors, reverse_dict): 
     path = 'same_author.csv'
     f = open(path, 'w')
     f.write("ID, ID \n")
     for ans in same_authors:
-        ans_str = [str(a) for a in ans]
+        ans_str = [str(reverse_dict[a]) for a in ans]
         out = ', '.join(ans_str) 
         f.write(out+'\n')    
     f.close()
